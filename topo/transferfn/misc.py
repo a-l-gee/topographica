@@ -3,7 +3,6 @@ Transfer functions with more complex dependencies.
 
 $Id: basic.py 10790 2009-11-21 17:51:33Z antolikjan $
 """
-__version__='$Revision: 10790 $'
 
 import copy
 
@@ -20,9 +19,8 @@ from topo.base.patterngenerator import PatternGenerator,Constant
 from topo.base.boundingregion import BoundingBox
 from topo.base.sheetcoords import SheetCoordinateSystem
 
-from topo.transferfn import TransferFn,TransferFnWithState
+from topo.transferfn import TransferFn, TransferFnWithState
 from topo.pattern import Gaussian
-
 
 # Not suitable for basic.py due to its dependence on patterns.
 class PatternCombine(TransferFn):
@@ -120,7 +118,6 @@ class KernelMax(TransferFn):
                                                     size=2*radius,x=wc+0.5,y=wy+0.5)
         x *= 0.0
         x[rmin:rmax,cmin:cmax] = kernel
-
 
 
 class HalfRectify(TransferFn):

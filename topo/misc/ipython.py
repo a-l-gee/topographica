@@ -6,79 +6,17 @@ loaded using:
 %load_ext topo.misc.ipython
 """
 import os
-import math
 import time
 import difflib
-import sys
 
 import topo
-import param
 
 
 try:
-    from IPython.core.display import clear_output
+    import IPython # pyflakes:ignore (Required import)
 except:
-    clear_output = None
     from nose.plugins.skip import SkipTest
     raise SkipTest("IPython extension requires IPython >= 0.12")
-
-# Pylabplots should return a matplotlib figure when working in Notebook
-# otherwise open display windows for the Topographica Tk GUI
-if not isinstance(sys.stdout, file):
-    from topo.command import pylabplot
-    pylabplot.PylabPlotCommand.display_window = False
-
-class ProgressBar(param.Parameterized):
-    """
-    A simple text progress bar suitable for the IPython notebook.
-    """
-
-    width = param.Integer(default=70, doc="""
-        The width of the progress bar in multiples of 'char'.""")
-
-    fill_char = param.String(default='#', doc="""
-        The character used to fill the progress bar.""")
-
-    def __init__(self, **kwargs):
-        super(ProgressBar,self).__init__(**kwargs)
-
-    def update(self, percentage):
-        " Update the progress bar to the given percentage value "
-        if clear_output: clear_output()
-        percent_per_char = 100.0 / self.width
-        char_count = int(math.floor(percentage/percent_per_char) if percentage<100.0 else self.width)
-        blank_count = self.width - char_count
-        print '\r', "[%s%s] %0.1f%%" % (self.fill_char * char_count,
-                              ' '*len(self.fill_char)*blank_count,
-                              percentage)
-        sys.stdout.flush()
-        time.sleep(0.0001)
-
-
-class RunProgress(ProgressBar):
-    """
-    Progress bar for running Topographica simulations in a Notebook.
-    """
-
-    interval = param.Number(default=20,
-        doc="How often to update the progress bar in topo.sim.time units")
-
-    def __init__(self, **kwargs):
-        super(RunProgress,self).__init__(**kwargs)
-
-    def run(self, duration):
-        """
-        Run topo.sim(duration), updating every interval duration.
-        """
-        completed = 0.0
-        while (duration - completed) >= self.interval:
-            topo.sim.run(self.interval)
-            completed += self.interval
-            self.update(100*(completed / duration))
-        remaining = duration - completed
-        if remaining != 0:
-            topo.sim.run(remaining)
-            self.update(100)
 
 
 def prompt(message, default, options, skip=False):
@@ -168,8 +106,16 @@ def export_notebook(notebook, output_path=None, ext='.ty', identifier='_export_'
 # Display hooks #
 #===============#
 
+from topo.base.sheetview import CFView
+
 from dataviews.ipython import load_ipython_extension as load_imagen_extension
-from dataviews.ipython import stack_display, view_display
+from dataviews.ipython.display_hooks import stack_display, view_display
+from dataviews.plots import SheetViewPlot, Plot
+
+from dataviews.ipython.widgets import RunProgress
+RunProgress.run_hook = topo.sim.run
+
+Plot.defaults.update({CFView: SheetViewPlot})
 
 try:
     from lancet import ViewFrame
@@ -179,6 +125,8 @@ except:
     pass
 
 
+
+
 _loaded = False
 def load_ipython_extension(ip):
     load_imagen_extension(ip, verbose=False)
@@ -186,6 +134,12 @@ def load_ipython_extension(ip):
     global _loaded
     if not _loaded:
         _loaded = True
+
+        try:
+            from lancet import load_ipython_extension as load_lancet_extension
+            load_lancet_extension(ip)
+        except:
+            pass
         from topo.command import runscript
         runscript.ns = ip.user_ns
         runscript.push = ip.push

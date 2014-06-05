@@ -2,9 +2,7 @@
 Code used to support old snapshots (those created from 0.9.7/r11275
 onwards).
 """
-from dataviews import odict
-
-__version__='$Revision: 8021 $'
+import collections as odict
 
 import sys
 import decimal # CEBALERT: when did decimal appear? too late to use?
@@ -303,8 +301,8 @@ support[11871] = pattern_basic_removed
 
 def param_external_removed():
     # CB: From param/external.py, only odict should be relevant to snapshots.
-    import dataviews.odict
-    allow_import(dataviews.odict,'param.external')
+    import collections
+    allow_import(collections,'param.external')
 
 support[12024] = param_external_removed
 
@@ -622,8 +620,8 @@ support[90800300] = featuremapper_legacy
 
 
 def topo_misc_odict_removed():
-    import dataviews.odict
-    allow_import(dataviews.odict, 'topo.misc.odict')
+    import collections
+    allow_import(collections, 'topo.misc.odict')
 
 support[90800361] = topo_misc_odict_removed
 

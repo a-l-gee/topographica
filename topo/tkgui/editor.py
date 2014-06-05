@@ -7,7 +7,6 @@ Window:  window and canvas
 
 Originally written by Alan Lindsay.
 """
-__version__='$Revision: 8989 $'
 
 from inspect import getdoc
 import math
@@ -1372,7 +1371,7 @@ class EditorSheet(EditorEP):
                 # AL, the idea will be to allow any available plots to be shown on the sheet.
                 # eg m = self.simobj.sheet_views['OrientationPreference'].view()[0]
                 update_activity()
-                m = self.simobj.views.maps['_activity_buffer'].top.data
+                m = self.simobj.views.maps['_activity_buffer'].last.data
                 if self.normalize == True:
                     m = self.normalize_plot(m)
                 matrix_width, matrix_height = self.element_count

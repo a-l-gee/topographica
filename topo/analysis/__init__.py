@@ -1,19 +1,145 @@
 """
 Analysis tools for Topographica, other than plotting tools.
+
+Configures the interface to the featuremapper and dataviews projects
+and sets the appropriate Topographica-specific hooks.
 """
 
 from topo.analysis.featureresponses import FeatureResponses, FeatureCurves,\
     FeatureMaps, ReverseCorrelation, MeasureResponseCommand, pattern_response,\
-    topo_metadata_fn, store_rfs, store_maps, store_curves, store_activity, \
-    get_feature_preference
+    topo_metadata_fn, StorageHook, get_feature_preference
 from featuremapper.command import measure_response
 
+import numpy as np
+
+from dataviews.collector import Reference
+from dataviews.options import channels, ChannelOpts
+from dataviews.operation import cmap2rgb, operator, chain
+
+import topo
+from featuremapper.command import Collector
+from topo.base.sheet import Sheet
+from topo.base.projection import Projection
+from topo.misc.ipython import RunProgress
+
+from command import measure_cog
+
+
+class SimRef(Reference):
+    """
+    A SimRef instance is installed on Collector to allow Topographica
+    model elements to be referenced for collection.
+
+    This is important to allow pickling and unpickling of Collectors
+    that work correctly with Topographica in different execution
+    environments (e.g. nodes of a cluster) and across different models
+    without directly pickling the components (e.g. Sheets and
+    Projections) themselves.
+
+    More information about references can be found in the docstring of
+    the dataviews.collector.Reference.
+    """
+    @property
+    def resolved_type(self):
+        if self.array_ref:
+            return np.ndarray
+        elif isinstance(self.obj, tuple):
+            return Projection
+        else:
+            return Sheet
+
+    def __init__(self, obj=None, array_ref=None):
+        if [obj, array_ref] == [None,None]:
+            raise Exception("Please specify an object, a path string or an array_ref.")
+
+        self.array_ref = None
+        if obj is None:
+            self.obj = None
+            self.array_ref = array_ref
+        elif isinstance(obj, str):
+            self.obj = tuple(obj.split('.')) if '.' in obj else obj
+        elif isinstance(obj, Projection):
+            self.obj = (obj.dest.name, obj.name)
+        else:
+            self.obj = obj.name
+
+    def resolve(self):
+        from topo import sim
+        if isinstance(self.obj, tuple):
+            (sheet, proj) = self.obj
+            return sim[sheet].projections()[proj]
+        elif self.obj:
+            return sim[self.obj]
+        else:
+            return eval('topo.sim.'+self.array_ref)
+
+    def __repr__(self):
+        if isinstance(self.obj, tuple):
+            return "SimRef(%r)" % '.'.join(el for el in self.obj)
+        elif self.obj is None:
+            return "SimRef(array_ref=%r)" % self.array_ref
+        else:
+            return "SimRef(%r)" % self.obj
+
+
+    def __str__(self):
+        if isinstance(self.obj, tuple):
+            return "topo.sim."+'.'.join(el for el in self.obj)
+        elif self.obj is None:
+            return "topo.sim." + self.array_ref
+        else:
+            return "topo.sim."+ self.obj
+
+
+### Collection hooks
+
+
+Collector.time_fn = topo.sim.time
+Collector.interval_hook = RunProgress
+
+
+def sheet_hook(obj, *args, **kwargs):
+    """
+    Return a SheetView of the Sheet activity.
+    """
+    return obj[:]
+
+def projection_hook(obj, *args, **kwargs):
+    """
+    Return a SheetView of the projection activity, otherwise if
+    grid=True, return a CoordinateGrid of the CFs.
+    """
+    if kwargs.pop('grid', False):
+        return obj.grid(**kwargs)
+    else:
+        return obj.projection_view()
+
+def measurement_hook(obj, *args, **kwargs):
+    return obj(*args, **kwargs)
+
+
+# Configure Collector with appropriate hooks
+Collector.sim = SimRef
+Collector.for_type(Sheet, sheet_hook, referencer=SimRef)
+Collector.for_type(Projection, projection_hook, referencer=SimRef)
+Collector.for_type(measure_cog,  measurement_hook, mode='merge')
+
+
+# Setting default channel operation for ON-OFF visualization
+ON_sub_OFF = chain.instance(chain=lambda x: [cmap2rgb(operator(x, operator=np.subtract).N, cmap='jet')])
+ChannelOpts.operations['ON_sub_OFF'] = ON_sub_OFF
+channels['ON_sub_OFF'] = ChannelOpts('ON_sub_OFF', "CF Weights * CF Weights")
+
+
+# Featuremapper hooks
 FeatureResponses.metadata_fns = [topo_metadata_fn]
 FeatureResponses.pattern_response_fn = pattern_response.instance()
-FeatureMaps.measurement_storage_hook = store_maps
-FeatureCurves.measurement_storage_hook = store_curves
-ReverseCorrelation.measurement_storage_hook = store_rfs
-measure_response.measurement_storage_hook = store_activity
+FeatureMaps.measurement_storage_hook = StorageHook.instance(sublabel='maps')
+FeatureCurves.measurement_storage_hook = StorageHook.instance(sublabel='curves')
+ReverseCorrelation.measurement_storage_hook = StorageHook.instance(sublabel='rfs')
+measure_response.measurement_storage_hook = StorageHook.instance(sublabel=None)
+measure_cog.measurement_storage_hook = StorageHook.instance(sublabel='CoG')
+
 
 MeasureResponseCommand.preference_lookup_fn = get_feature_preference
 MeasureResponseCommand.pattern_response_fn = pattern_response.instance()

@@ -28,9 +28,8 @@ from simulation import EventProcessor
 
 from functionfamily import TransferFn
 
-from dataviews import SheetView
-from dataviews.sheetcoords import SheetCoordinateSystem
-from dataviews.boundingregion import BoundingBox, BoundingRegionParameter
+from dataviews.sheetviews import BoundingBox, BoundingRegionParameter,\
+    SheetCoordinateSystem, SheetView
 
 activity_type = float64
 
@@ -308,7 +307,10 @@ class Sheet(EventProcessor,SheetCoordinateSystem):  # pylint: disable-msg=W0223
         metadata = AttrDict(precedence=self.precedence,
                             row_precedence=self.row_precedence,
                             timestamp=self.simulation.time())
-        return SheetView(self.activity.copy(), self.bounds,
-                         title=self.name, metadata=metadata)[coords]
+
+        sv = SheetView(self.activity.copy(), self.bounds,
+                       label=self.name+' Activity', value='Activity')[coords]
+        sv.metadata=metadata
+        return sv
 
 

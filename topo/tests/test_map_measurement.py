@@ -118,6 +118,7 @@ def checkclose(label,version,x,y):
         print '...%s array is unchanged since data was generated (%s)' % (label,topo_version)
     return errors
 
+
 @nottest
 def test(plotgroup_names):
     import topo
@@ -142,6 +143,13 @@ def test(plotgroup_names):
             topo_version,previous_views = pickle.load(f)
         ########################################
         except AttributeError:
+            # PRALERT: Code to allow loading of old data files after
+            # boundingregion was moved to dataviews.
+            import sys
+            from dataviews.sheetviews import boundingregion
+            sys.modules['imagen.boundingregion'] = boundingregion
+
+
             # CEBALERT: code here just to support old data file. Should
             # generate a new one so it's no longer necessary.
 
@@ -167,7 +175,7 @@ def test(plotgroup_names):
             previous_sheet_views = previous_views[sheet.name]['sheet_views']
             for view_name in previous_sheet_views:
                 failing_tests += checkclose(sheet.name + " " + view_name,topo_version,
-                                            sheet.views.maps[view_name].top.data,
+                                            sheet.views.maps[view_name].last.data,
                                             previous_sheet_views[view_name].view()[0])
 
         if 'curve_dict' in previous_views[sheet.name]:
@@ -178,7 +186,7 @@ def test(plotgroup_names):
                 for other_param in previous_curve_dicts[curve_name]:
                     other_param_val = unit_value(other_param)[-1]
                     for val in previous_curve_dicts[curve_name][other_param]:
-                        new_curves = sheet.views.curves[curve_name.capitalize()]
+                        new_curves = sheet.views.curves[curve_name.capitalize()+"Tuning"]
                         new = new_curves[time, duration, other_param_val-0.01:other_param_val+0.01, val].values()[0].data
                         old = previous_curve_dicts[curve_name][other_param][val].view()[0]
                         failing_tests += checkclose("%s %s %s %s" %(sheet.name,curve_name,other_param,val),

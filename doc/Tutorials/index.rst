@@ -11,7 +11,7 @@ Tutorials using the Tk GUI
 The Tk GUI is a good way to explore a model without needing to
 write any additional code.
 
-:doc:`gcal`
+|gcal_gui_tutorial|_
 
 How to run and test a simple orientation map simulation using the
 GCAL cortical model from
@@ -24,7 +24,7 @@ different input patterns.
 This tutorial supersedes an `older tutorial`_ using the LISSOM model
 from  `Miikkulainen et al. (2005) <http://computationalmaps.org>`_.
 
-:doc:`som_retinotopy`
+|som_retinotopy_gui|_
 
 How to run a model that develops selectivity for position,
 mapping the input space to the cortical space. The model uses the
@@ -86,6 +86,12 @@ Topographica works and how to use a Topographica model in practice. If
 you develop any other tutorials for your own models, we would love to
 add them here!
 
+.. _gcal_gui_tutorial: ./gcal.html
+.. |gcal_gui_tutorial| replace:: GCAL GUI Tutorial
+
+.. _som_retinotopy_gui: ./som_retinotopy.html
+.. |som_retinotopy_gui| replace:: SOM Retinotopy GUI Tutorial
+
 .. Trick to get matching italic style for the links
 .. _gcal_ipynb: ../_static/gcal.html
 .. |gcal_ipynb| replace:: *GCAL Model definition*
@@ -95,5 +101,5 @@ add them here!
 
 .. _older tutorial: ./lissom_oo_or.html
 
-.. _som_ipynb: http://ioam.github.io/media/som_retinotopy.html
+.. _som_ipynb: http://ioam.github.io/media/topo/som_retinotopy.html
 .. |som_ipynb| replace:: *SOM Retinotopic Map*

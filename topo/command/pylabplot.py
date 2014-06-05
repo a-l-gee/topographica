@@ -34,7 +34,7 @@ from topo.plotting.plot import make_template_plot
 from param import ParameterizedFunction, normalize_path
 from param.parameterized import ParamOverrides
 
-from dataviews.plots import DataPlot
+from dataviews.plots import DataPlot, GridLayout
 
 from topo.command import Command
 
@@ -468,8 +468,8 @@ class topographic_grid(xy_grid):
         for sheet in topo.sim.objects(Sheet).values():
             if ((p.xsheet_view_name in sheet.views.maps) and
                     (p.ysheet_view_name in sheet.views.maps)):
-                x = sheet.views.maps[p.xsheet_view_name].top.data
-                y = sheet.views.maps[p.ysheet_view_name].top.data
+                x = sheet.views.maps[p.xsheet_view_name].last.data
+                y = sheet.views.maps[p.ysheet_view_name].last.data
 
                 filename_suffix = "_" + sheet.name
                 title = 'Topographic mapping to ' + sheet.name + ' at time ' \
@@ -615,13 +615,17 @@ class tuning_curve(PylabPlotCommand):
         p = ParamOverrides(self, params, allow_extra_keywords=True)
 
         x_axis = p.x_axis.capitalize()
-        stack = p.sheet.views.curves[x_axis]
-        time = stack.dim_max('Time')
-        curves = stack[time, :, :, :].sample(coords=p.coords, x_axis=x_axis,
-                                             group_by=p.group_by)
+        stack = p.sheet.views.curves[x_axis.capitalize()+"Tuning"]
+        time = stack.dim_range('Time')[1]
+
+
+        curves = stack[time, :, :, :].sample(coords=p.coords).collate(p.x_axis.capitalize())
+        overlaid_curves = curves.overlay_dimensions(p.group_by)
+
+        if not isinstance(curves, GridLayout): curves = [overlaid_curves]
 
         figs = []
-        for coord, curve in curves:
+        for coord, curve in zip(p.coords,curves):
             fig = plt.figure()
             ax = plt.subplot(111)
             DataPlot(curve, center=p.center, relative_labels=p.relative_labels,
@@ -631,7 +635,7 @@ class tuning_curve(PylabPlotCommand):
 
         return figs
 
-        
+
     def _generate_figure(self, p, fig):
         """
         Helper function to display a figure on screen or save to a file.
@@ -651,8 +655,11 @@ class tuning_curve(PylabPlotCommand):
         else:
             fig.close()
 
-        
+
 cyclic_tuning_curve = tuning_curve
+
+def cyclic_unit_tuning_curve(coord=(0, 0), **kwargs):
+    return tuning_curve(coords=[coord], **kwargs)[0]
 
 
 

@@ -14,9 +14,8 @@ import numpy as np
 import param
 
 from dataviews import SheetView as ImagenSheetView
-from dataviews import SheetStack
-from dataviews.sheetcoords import SheetCoordinateSystem
-from dataviews.boundingregion import BoundingRegion
+from dataviews.sheetviews import BoundingRegion, SheetCoordinateSystem, SheetStack
+from dataviews.options import options, StyleOpts
 
 
 class SheetView(param.Parameterized):
@@ -99,6 +98,10 @@ class CFView(ImagenSheetView):
         Slice indices of the embedded view into the situated matrix.""")
 
     @property
+    def stack_type(self):
+        return CFStack
+
+    @property
     def situated(self):
         if self.bounds.lbrt() == self.situated_bounds.lbrt():
             return self
@@ -114,8 +117,7 @@ class CFView(ImagenSheetView):
 
         return ImagenSheetView(data, self.situated_bounds, roi_bounds=self.roi_bounds,
                                situated_bounds=self.situated_bounds,
-                               cyclic_range=self.cyclic_range,
-                               style=self.style, metadata=self.metadata)
+                               label=self.label, value=self.value)
 
 
 class CFStack(SheetStack):
@@ -123,3 +125,6 @@ class CFStack(SheetStack):
     @property
     def situated(self):
         return self.map(lambda x, _: x.situated)
+
+
+options.CFView = StyleOpts(interpolation='nearest')

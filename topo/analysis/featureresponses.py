@@ -30,6 +30,7 @@ from featuremapper.command import PatternPresentingCommand, MeasureResponseComma
 from featuremapper import MeasurementInterrupt, DistributionMatrix, FullMatrix, FeatureResponses,\
     ReverseCorrelation, FeatureMaps, FeatureCurves, Feature
 from featuremapper.metaparams import *  # pyflakes:ignore (API import)
+from featuremapper.features import Time
 
 activity_dtype = np.float64
 
@@ -45,18 +46,20 @@ def update_sheet_activity(sheet_name, force=False):
     sheet = topo.sim.objects(Sheet)[sheet_name]
     view = sheet.views.maps.get(name, False)
     time = topo.sim.time()
-    metadata = AttrDict(bounds=sheet.bounds, precedence=sheet.precedence,
+    metadata = AttrDict(precedence=sheet.precedence,
                         row_precedence=sheet.row_precedence,
                         src_name=sheet.name, shape=sheet.activity.shape,
                         timestamp=time)
     if not view:
-        sv = SheetView(np.array(sheet.activity), sheet.bounds, metadata=metadata)
-        view = SheetStack((time, sv), dimension_labels=['Time'], **metadata)
+        sv = SheetView(np.array(sheet.activity), sheet.bounds)
+        sv.metadata=metadata
+        view = SheetStack((time, sv), dimensions=[Time])
+        view.metadata = metadata
         sheet.views.maps[name] = view
     else:
-        if force or view.timestamp < time:
-            sv = SheetView(np.array(sheet.activity), sheet.bounds,
-                           metadata=metadata)
+        if force or view.dim_range('Time')[1] < time:
+            sv = SheetView(np.array(sheet.activity), sheet.bounds)
+            sv.metadata=metadata
             view[time] = sv
     return view
 
@@ -331,58 +334,28 @@ def topo_metadata_fn(input_names=[], output_names=[]):
     return metadata
 
 
-def store_rfs(measurement_dict):
-    """
-    Store RFs in the global sheet views dictionary.
-    """
-    measurement_dict.pop('fullmatrix')
-    for sheet_name, sheet_data in measurement_dict.items():
-        sheet = topo.sim[sheet_name]
-        for data_name, data in sheet_data.items():
-            if data_name not in sheet.views.rfs:
-                sheet.views.rfs[data_name] = data
+class StorageHook(param.ParameterizedFunction):
+
+    sublabel = param.String(default=None, allow_None=True, doc="""
+        Storage location on the sheet specific view object. If None simply
+        inserts results into top level views object.""")
+
+    def __call__(self, viewcontainer, **params):
+        p = ParamOverrides(self, params)
+        objects = dict(topo.sim.objects(), **dict([(proj.name, proj) for proj in topo.sim.connections()]))
+        for path, container in viewcontainer.path_items.items():
+            label, src_name = path
+            source = objects[src_name]
+            if isinstance(source, Sheet):
+                storage = source.views[p.sublabel] if p.sublabel else source.views
             else:
-                sheet.views.rfs[data_name].update(data)
-
-
-def store_curves(measurement_dict):
-    """
-    Store curves in the global sheet views dictionary.
-    """
-    measurement_dict.pop('fullmatrix')
-    for sheet_name, data in measurement_dict.items():
-        sheet = topo.sim[sheet_name]
-        storage = sheet.views.curves
-        label = data.metadata.label
-        if label in storage:
-            storage[label].update(data)
-        else:
-            storage[label] = data
-
-
-def store_maps(measurement_dict):
-    """
-    Store maps in the global sheet view dictionary.
-    """
-    measurement_dict.pop('fullmatrix')
-    for sheet_name, sheet_data in measurement_dict.items():
-        if sheet_name in topo.sim.objects(Sheet).keys():
-            sheet = topo.sim[sheet_name]
-            for map_name, data in sheet_data.items():
-                if map_name not in sheet.views.maps:
-                    sheet.views.maps[map_name] = data
-                else:
-                    sheet.views.maps[map_name].update(data)
-
-
-def store_activity(measurement_dict):
-    for sheet_name, sheet_data in measurement_dict.items():
-        if sheet_name in topo.sim.objects(Sheet).keys():
-            sheet = topo.sim[sheet_name]
-            if 'Activity' not in sheet.views.maps:
-                sheet.views.maps['Activity'] = sheet_data
+                proj_store = source.dest.views[source.name] = {}
+                proj_store[p.sublabel] = {}
+                storage = proj_store[p.sublabel]
+            if label not in storage:
+                storage[label] = container
             else:
-                sheet.views.maps['Activity'].update(sheet_data)
+                storage[label].update(container)
 
 
 def get_feature_preference(feature, sheet_name, coords, default=0.0):
@@ -391,7 +364,7 @@ def get_feature_preference(feature, sheet_name, coords, default=0.0):
         sheet = topo.sim[sheet_name]
         map_name = feature.capitalize() + "Preference"
         x, y = coords
-        return sheet.views.maps[map_name].top[x, y]
+        return sheet.views.maps[map_name].last[x, y]
     except:
         topo.sim.warning(
             ("%s should be measured before plotting this tuning curve -- "

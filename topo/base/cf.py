@@ -22,10 +22,9 @@ from copy import copy
 import numpy as np
 
 import param
-from dataviews.ndmapping import AttrDict
+from dataviews.ndmapping import AttrDict, Dimension
 from dataviews import CoordinateGrid
-from dataviews.sheetcoords import Slice
-from dataviews.boundingregion import BoundingBox, BoundingRegionParameter
+from dataviews.sheetviews import BoundingBox, BoundingRegionParameter, Slice
 
 import patterngenerator
 from patterngenerator import PatternGenerator
@@ -625,9 +624,13 @@ class CFProjection(Projection):
     def _cf_grid(self, shape=None, **kwargs):
         "Create ProjectionGrid with the correct metadata."
         shape = self.dest.shape if shape is None else shape
-        return CoordinateGrid(self.dest.bounds, shape, info=self.name,
-                              proj_src_name=self.src.name, proj_dest_name=self.dest.name,
-                              timestamp=self.src.simulation.time(), **kwargs)
+        grid = CoordinateGrid(self.dest.bounds, shape)
+        grid.metadata = AttrDict(timestamp=self.src.simulation.time(),
+                                 info=self.name,
+                                 proj_src_name=self.src.name,
+                                 proj_dest_name=self.dest.name,
+                                 **kwargs)
+        return grid
 
 
     def _generate_coords(self):
@@ -716,9 +719,15 @@ class CFProjection(Projection):
         for x, y in coords:
             grid_items[x, y] = self.view(x, y, situated=situated, **kwargs)
 
-        return CoordinateGrid(bounds, (cols, rows), info=self.name, initial_items=grid_items,
-                              proj_src_name=self.src.name, proj_dest_name=self.dest.name,
-                              timestamp=self.src.simulation.time(), **kwargs)
+        grid = CoordinateGrid(bounds, (cols, rows), initial_items=grid_items,
+                              title=' '.join([self.dest.name, self.name, '{label}']),
+                              label='CFs')
+        grid.metadata = AttrDict(info=self.name,
+                                 proj_src_name=self.src.name,
+                                 proj_dest_name=self.dest.name,
+                                 timestamp=self.src.simulation.time(),
+                                 **kwargs)
+        return grid
 
 
     def view(self, sheet_x, sheet_y, timestamp=None, situated=False, **kwargs):
@@ -728,6 +737,7 @@ class CFProjection(Projection):
         """
         if timestamp is None:
             timestamp = self.src.simulation.time()
+        time_dim = Dimension("Time", type=param.Dynamic.time_fn.time_type)
         (r, c) = self.dest.sheet2matrixidx(sheet_x, sheet_y)
         cf = self.cfs[r, c]
         r1, r2, c1, c2 = cf.input_sheet_slice
@@ -744,14 +754,17 @@ class CFProjection(Projection):
 
         sv = CFView(matrix_data, bounds, situated_bounds=situated_bounds,
                     input_sheet_slice=(r1, r2, c1, c2), roi_bounds=roi_bounds,
-                    metadata=AttrDict(timestamp=timestamp))
+                    label=self.name+ " CF Weights", value='CF Weight')
+        sv.metadata=AttrDict(timestamp=timestamp)
 
-        return CFStack((timestamp, sv), coords=(sheet_x, sheet_y),
-                       dimension_labels=['Time'], dest_name=self.dest.name,
-                       precedence=self.src.precedence, proj_name=self.name,
-                       src_name=self.src.name,
-                       row_precedence=self.src.row_precedence,
-                       timestamp=timestamp, **kwargs)
+        cfstack = CFStack((timestamp, sv), dimensions=[time_dim])
+        cfstack.metadata = AttrDict(coords=(sheet_x, sheet_y),
+                                    dest_name=self.dest.name,
+                                    precedence=self.src.precedence, proj_name=self.name,
+                                    src_name=self.src.name,
+                                    row_precedence=self.src.row_precedence,
+                                    timestamp=timestamp, **kwargs)
+        return cfstack
 
 
     def get_view(self, sheet_x, sheet_y, timestamp=None):
